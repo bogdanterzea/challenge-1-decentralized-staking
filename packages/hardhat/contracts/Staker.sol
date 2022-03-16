@@ -52,7 +52,7 @@ contract Staker {
 
   // Add a `withdraw(address payable)` function lets users withdraw their balance
 
-  function withdraw(address payable) external {
+  function withdraw(address payable destination) external returns(bool) {
     if (openForWithdraw) {
       uint256 amount = balances[msg.sender];
       if (amount > 0) {
