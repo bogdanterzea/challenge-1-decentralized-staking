@@ -8,15 +8,30 @@ contract Staker {
 
   mapping ( address => uint256 ) public balances;
 
-  uint256 public constant threshold = 1 ether;
-  uint256 private deadline = block.timestamp;
+  uint256 public constant threshold = 0;
+  uint256 private deadline = block.timestamp + 30;
 
   bool private openForWithdraw = false;
 
   event Stake(address from, uint256 amount);
 
-
   ExampleExternalContract public exampleExternalContract;
+
+  modifier deadlineReached( bool requireReached ) {
+    uint256 timeRemaining = timeLeft();
+    if( requireReached ) {
+      require(timeRemaining == 0, "Deadline is not reached yet");
+    } else {
+      require(timeRemaining > 0, "Deadline is already reached");
+    }
+    _;
+  }
+
+  modifier stakeNotCompleted() {
+    bool completed = exampleExternalContract.completed();
+    require(!completed, "staking process already completed");
+    _;
+  }
 
   constructor(address exampleExternalContractAddress) public {
       exampleExternalContract = ExampleExternalContract(exampleExternalContractAddress);
@@ -46,30 +61,22 @@ contract Staker {
     }
   }
 
-
   // if the `threshold` was not met, allow everyone to call a `withdraw()` function
 
 
   // Add a `withdraw(address payable)` function lets users withdraw their balance
 
   function withdraw(address payable destination) external returns(bool) {
-    if (openForWithdraw) {
-      uint256 amount = balances[msg.sender];
-      if (amount > 0) {
-        balances[msg.sender] = 0;
-        (bool success, ) = destination.call{value: amount}('');
-        if (!success) {
-          balances[msg.sender] = amount;
-          return false;
-        }
-      }
-    }
-    return true;
+    uint256 userBalance = balances[msg.sender];
+    require(userBalance > 0, "You have no funds to withdraw");
+    balances[msg.sender] = 0;
+    (bool sent, ) = msg.sender.call{value: userBalance}("");
+    require(sent, "FAILED TO SEND FUNDS");
   }
 
   // Add a `timeLeft()` view function that returns the time left before the deadline for the frontend
 
-  function timeLeft() external view returns (uint256) {
+  function timeLeft() public view returns (uint256) {
     if(block.timestamp >= deadline) {
       return 0;
     } else {
